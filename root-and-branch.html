@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Root &amp; Branch — sudo &amp; git dojo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg:#F5F6F8;
+  --panel:#FFFFFF;
+  --border:#E2E5EB;
+  --text:#1B1F27;
+  --text-muted:#68707E;
+  --sudo:#C2740E;
+  --sudo-soft:#FBEEDC;
+  --sudo-line:#EAD3AC;
+  --git:#0E8C7F;
+  --git-soft:#DFF3F0;
+  --git-line:#AFDDD5;
+  --term-bg:#161A21;
+  --term-text:#D7DEE8;
+  --term-dim:#7C8698;
+  --term-green:#7ED9A0;
+  --term-red:#F08B8B;
+  --term-prompt:#6FB3F2;
+  --radius:12px;
+  --shadow:0 1px 2px rgba(20,24,32,0.04), 0 8px 24px rgba(20,24,32,0.05);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'IBM Plex Sans',sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif; margin:0;}
+code, .mono{font-family:'IBM Plex Mono',monospace;}
+
+.app{max-width:1180px; margin:0 auto; padding:20px 20px 40px;}
+
+/* ---------- Topbar ---------- */
+.topbar{
+  display:flex; align-items:center; flex-wrap:wrap; gap:16px;
+  padding:14px 18px; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:18px;
+}
+.brand{display:flex; align-items:center; gap:10px; margin-right:auto;}
+.brand-icon{width:30px;height:30px; color:var(--text); flex:none;}
+.brand h1{font-size:19px; letter-spacing:-0.01em;}
+.brand .tag{display:block; font-size:12px; color:var(--text-muted); margin-top:1px;}
+
+.tabs{display:flex; gap:6px; background:var(--bg); padding:4px; border-radius:999px; border:1px solid var(--border);}
+.tab{
+  display:flex; align-items:center; gap:6px; border:none; background:transparent; cursor:pointer;
+  padding:7px 14px; border-radius:999px; font:600 13px 'IBM Plex Sans',sans-serif; color:var(--text-muted);
+  transition:background .15s, color .15s;
+}
+.tab svg{width:15px;height:15px;}
+.tab-sudo.active{background:var(--sudo-soft); color:var(--sudo);}
+.tab-git.active{background:var(--git-soft); color:var(--git);}
+
+.progress-summary{font-size:12px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace; white-space:nowrap;}
+.progress-summary b{color:var(--text);}
+
+/* ---------- Layout ---------- */
+.layout{display:grid; grid-template-columns:230px 1fr; gap:18px; align-items:start;}
+@media (max-width:860px){ .layout{grid-template-columns:1fr;} }
+
+/* ---------- Sidebar / git-graph lesson list ---------- */
+.sidebar{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:14px 14px 16px;
+}
+.sidebar-title{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:600; margin-bottom:10px;}
+.lesson-node{position:relative; padding:0 0 18px 26px; cursor:pointer;}
+.lesson-node:last-child{padding-bottom:2px;}
+.lesson-node::before{ /* connecting line */
+  content:""; position:absolute; left:8px; top:18px; bottom:-2px; width:2px; background:var(--border);
+}
+.lesson-node:last-child::before{display:none;}
+.lesson-node .dot{
+  position:absolute; left:0; top:1px; width:17px; height:17px; border-radius:50%;
+  background:var(--panel); border:2px solid var(--border); display:flex; align-items:center; justify-content:center;
+}
+.lesson-node .dot svg{width:9px;height:9px; color:#fff; display:none;}
+.lesson-node.done .dot{background:var(--track-color); border-color:var(--track-color);}
+.lesson-node.done .dot svg{display:block;}
+.lesson-node.active .dot{border-color:var(--track-color); box-shadow:0 0 0 3px var(--track-soft);}
+.lesson-node .label{font-size:13px; font-weight:500; color:var(--text); line-height:1.3;}
+.lesson-node.active .label{color:var(--track-color); font-weight:600;}
+.lesson-node .idx{font-size:11px; color:var(--text-muted); font-family:'IBM Plex Mono',monospace;}
+.sidebar-foot{margin-top:14px; padding-top:12px; border-top:1px dashed var(--border);}
+.reset-btn{
+  width:100%; font:500 12px 'IBM Plex Sans',sans-serif; color:var(--text-muted); background:var(--bg);
+  border:1px solid var(--border); border-radius:8px; padding:8px; cursor:pointer;
+}
+.reset-btn:hover{color:var(--text); border-color:#c9ccd3;}
+
+/* ---------- Content column ---------- */
+.content{display:flex; flex-direction:column; gap:16px;}
+
+.lesson-card{
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:20px 22px;
+}
+.eyebrow{font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--track-color); margin-bottom:6px;}
+.lesson-card h2{font-size:21px; margin-bottom:10px;}
+.analogy{font-size:14.5px; line-height:1.6; color:var(--text); margin-bottom:14px;}
+.analogy b{color:var(--track-color);}
+.task-box{
+  background:var(--track-soft); border:1px solid var(--track-line); border-radius:10px; padding:12px 14px; margin-bottom:10px;
+}
+.task-box .task-label{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--track-color); margin-bottom:5px;}
+.task-box p{margin:0; font-size:13.5px; line-height:1.55;}
+.chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+.chip{
+  font:500 12px 'IBM Plex Mono',monospace; background:#fff; border:1px solid var(--track-line); color:var(--track-color);
+  padding:3px 8px; border-radius:6px; cursor:pointer;
+}
+.chip:hover{background:var(--track-soft);}
+.hint-row{display:flex; align-items:center; justify-content:space-between; margin-top:8px;}
+.hint-toggle{background:none; border:none; color:var(--text-muted); font-size:12.5px; cursor:pointer; padding:0; text-decoration:underline; text-underline-offset:2px;}
+.hint-text{font-size:13px; color:var(--text-muted); margin-top:6px; display:none; font-family:'IBM Plex Mono',monospace; background:var(--bg); padding:8px 10px; border-radius:8px;}
+.hint-text.show{display:block;}
+.success-banner{
+  display:none; align-items:center; gap:8px; margin-top:12px; padding:9px 12px; border-radius:9px;
+  background:#E9F8EE; border:1px solid #B9E8C6; color:#1E7A3C; font-size:13px; font-weight:600;
+}
+.success-banner.show{display:flex;}
+.success-banner svg{width:16px;height:16px; flex:none;}
+
+/* ---------- Terminal ---------- */
+.terminal-wrap{background:var(--term-bg); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; border:1px solid #0e1116;}
+.terminal-bar{display:flex; align-items:center; gap:8px; padding:9px 14px; background:#1E232C; border-bottom:1px solid #0e1116;}
+.terminal-bar .dots{display:flex; gap:6px;}
+.terminal-bar .dots span{width:10px; height:10px; border-radius:50%; display:inline-block;}
+.dots span:nth-child(1){background:#F0857C;} .dots span:nth-child(2){background:#EFC078;} .dots span:nth-child(3){background:#7ED9A0;}
+.terminal-bar .term-title{margin-left:6px; font:500 12px 'IBM Plex Mono',monospace; color:var(--term-dim);}
+.terminal{
+  height:280px; overflow-y:auto; padding:14px 16px; font:13.5px/1.6 'IBM Plex Mono',monospace; color:var(--term-text);
+  white-space:pre-wrap; word-break:break-word;
+}
+.term-line-cmd{color:var(--term-text);}
+.term-line-cmd .p{color:var(--term-prompt); margin-right:6px;}
+.term-line-cmd .p.sudo{color:var(--sudo);}
+.term-line-out{color:var(--term-text);}
+.term-line-err{color:var(--term-red);}
+.term-line-ok{color:var(--term-green);}
+.term-line-sys{color:var(--term-dim); font-style:italic;}
+.terminal-input-row{display:flex; align-items:center; gap:8px; padding:10px 16px 14px; background:var(--term-bg);}
+.terminal-input-row .prompt{color:var(--term-prompt); font:600 13.5px 'IBM Plex Mono',monospace; white-space:nowrap;}
+.terminal-input-row input{
+  flex:1; background:transparent; border:none; outline:none; color:var(--term-text);
+  font:13.5px 'IBM Plex Mono',monospace; caret-color:var(--term-green);
+}
+.terminal-input-row input::placeholder{color:#4b5361;}
+
+.cheatsheet{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px 20px;}
+.cheatsheet summary{cursor:pointer; font-weight:600; font-size:13.5px; color:var(--text);}
+.cheat-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:8px 18px; margin-top:12px;}
+.cheat-item{font-size:12.5px; display:flex; gap:8px; align-items:baseline;}
+.cheat-item code{background:var(--bg); padding:2px 6px; border-radius:5px; color:var(--track-color); white-space:nowrap;}
+.cheat-item span{color:var(--text-muted);}
+
+::-webkit-scrollbar{width:9px; height:9px;}
+::-webkit-scrollbar-thumb{background:#2a303b; border-radius:6px;}
+.sidebar::-webkit-scrollbar-thumb{background:#d7dae0;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="7" cy="7" r="3"/><circle cx="7" cy="17" r="3"/><circle cx="17" cy="10" r="3"/>
+        <path d="M7 10v4M7 8.6C7 13 11 13 15.5 11.6"/>
+      </svg>
+      <div>
+        <h1>Root &amp; Branch</h1>
+        <span class="tag">Learn sudo &amp; git by actually typing them</span>
+      </div>
+    </div>
+    <div class="tabs" id="trackTabs">
+      <button class="tab tab-sudo active" data-track="sudo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="15" r="4"/><path d="M10.3 11.7 19.5 2.5M14.5 6.5l3 3M12 9l2 2"/></svg>
+        <span>sudo</span>
+      </button>
+      <button class="tab tab-git" data-track="git">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><circle cx="18" cy="9" r="2.4"/><path d="M6 8.4V15.6M6 8.4C6 12 9.2 12 15.6 12v-1"/></svg>
+        <span>git</span>
+      </button>
+    </div>
+    <div class="progress-summary" id="progressSummary">–</div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <section class="content">
+      <div class="lesson-card" id="lessonCard"></div>
+
+      <div class="terminal-wrap">
+        <div class="terminal-bar">
+          <span class="dots"><span></span><span></span><span></span></span>
+          <span class="term-title" id="termTitle">precious@dojo — sudo</span>
+        </div>
+        <div class="terminal" id="terminal"></div>
+        <div class="terminal-input-row">
+          <span class="prompt" id="promptLabel">precious@dojo:~$</span>
+          <input id="termInput" autocomplete="off" spellcheck="false" placeholder="type a command and press Enter…">
+        </div>
+      </div>
+
+      <details class="cheatsheet" id="cheatsheet">
+        <summary>Command reference</summary>
+        <div class="cheat-grid" id="cheatGrid"></div>
+      </details>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+
+/* ============================= ENGINE ============================= */
+const USERNAME = "precious";
+
+function tokenize(str){
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let tokens = [], m;
+  while((m = re.exec(str)) !== null){
+    tokens.push(m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]));
+  }
+  return tokens;
+}
+function shortId(n){ return (n*2654435761 % 16777215).toString(16).padStart(7,'0').slice(0,7); }
+
+function freshSudoState(){
+  return {
+    kind:'sudo',
+    files:{
+      'notes.txt':{owner:USERNAME, perm:'rw-r--r--', content:'buy coffee\n'},
+      'script.sh':{owner:USERNAME, perm:'rwxr-xr-x', content:'#!/bin/bash\necho hi\n'}
+    },
+    etc:{
+      '/etc/hosts':{owner:'root', perm:'rw-r--r--', content:'127.0.0.1 localhost\n', edited:false}
+    },
+    installedPackages:[]
+  };
+}
+function freshGitState(){
+  return {
+    kind:'git',
+    files:{},
+    initialized:false,
+    staged:[],
+    branches:{ main:{commits:[]} },
+    currentBranch:'main',
+    remote:null,
+    pushedBranches:{},
+    commitCounter:0
+  };
+}
+
+function execute(state, raw){
+  raw = raw.trim();
+  if(!raw) return {output:[], error:false};
+  const tokensAll = tokenize(raw);
+  let isSudo = false, tokens = tokensAll;
+  if(tokens[0] === 'sudo'){ isSudo = true; tokens = tokens.slice(1); }
+  if(tokens.length === 0) return {output:['sudo: a command is required'], error:true};
+
+  const cmd = tokens[0];
+  const out = []; let error = false;
+
+  switch(cmd){
+    case 'whoami':
+      out.push(isSudo ? 'root' : USERNAME); break;
+    case 'clear':
+      out.push('__CLEAR__'); break;
+    case 'help':
+      if(state.kind === 'sudo'){
+        out.push('whoami · ls [-l] · cat <file> · touch <file> · nano <file>',
+                  'chmod <mode> <file> · chown <user> <file>',
+                  'sudo <any of the above> · sudo apt update|install <pkg>|remove <pkg>');
+      } else {
+        out.push('git init · git status · git add <file|.> · git commit -m "msg"',
+                  'git log · git branch [name] · git checkout|switch [-b] <name>',
+                  'git merge <name> · git remote add origin <url> · git push · git pull · git clone <url>');
+      }
+      break;
+    case 'ls': {
+      const names = Object.keys(state.files);
+      if(names.length === 0){ out.push(''); break; }
+      if(tokens[1] === '-l'){
+        names.forEach(n=>{ const f=state.files[n]; out.push('-'+f.perm+'  '+f.owner+'  '+n); });
+      } else {
+        out.push(names.join('  '));
+      }
+      break;
+    }
+    case 'cat': {
+      const fname = tokens[1];
+      if(!fname){ out.push('cat: missing operand'); error=true; break; }
+      const bucket = fname.startsWith('/etc/') ? state.etc : state.files;
+      const f = bucket[fname];
+      if(!f){ out.push('cat: '+fname+': No such file or directory'); error=true; }
+      else out.push(...f.content.split('\n').filter((l,i,arr)=> !(i===arr.length-1 && l==='')));
+      break;
+    }
+    case 'touch': {
+      const fname = tokens[1];
+      if(!fname){ out.push('touch: missing file operand'); error=true; break; }
+      if(!state.files[fname]) state.files[fname] = {owner:USERNAME, perm:'rw-r--r--', content:''};
+      break;
+    }
+    case 'nano': case 'vim': case 'vi': {
+      const fname = tokens[1];
+      if(!fname){ out.push(cmd+': missing file operand'); error=true; break; }
+      if(fname.startsWith('/etc/')){
+        const f = state.etc[fname];
+        if(!f){ out.push(cmd+': '+fname+': No such file or directory'); error=true; break; }
+        if(!isSudo){ out.push(cmd+': '+fname+': Permission denied (try: sudo '+cmd+' '+fname+')'); error=true; }
+        else { f.edited = true; out.push('[sudo] "'+fname+'" saved — 1 line written'); }
+      } else {
+        if(!state.files[fname]) state.files[fname] = {owner:USERNAME, perm:'rw-r--r--', content:''};
+        out.push('"'+fname+'" saved');
+      }
+      break;
+    }
+    case 'chmod': {
+      const mode = tokens[1], fname = tokens[2];
+      if(!mode || !fname){ out.push('chmod: missing operand'); error=true; break; }
+      const bucket = fname.startsWith('/etc/') ? state.etc : state.files;
+      const f = bucket[fname];
+      if(!f){ out.push("chmod: cannot access '"+fname+"': No such file or directory"); error=true; break; }
+      if(f.owner === 'root' && !isSudo){ out.push("chmod: changing permissions of '"+fname+"': Operation not permitted"); error=true; break; }
+      f.perm = mode;
+      out.push("mode of '"+fname+"' changed to "+mode);
+      break;
+    }
+    case 'chown': {
+      const newOwner = tokens[1], fname = tokens[2];
+      if(!newOwner || !fname){ out.push('chown: missing operand'); error=true; break; }
+      const bucket = fname && fname.startsWith('/etc/') ? state.etc : state.files;
+      const f = bucket[fname];
+      if(!f){ out.push("chown: cannot access '"+fname+"': No such file or directory"); error=true; break; }
+      if(!isSudo){ out.push("chown: changing ownership of '"+fname+"': Operation not permitted"); error=true; break; }
+      f.owner = newOwner;
+      out.push("ownership of '"+fname+"' changed to "+newOwner);
+      break;
+    }
+    case 'apt': {
+      if(!isSudo){ out.push('E: Could not open lock file /var/lib/dpkg/lock — are you root? (try: sudo apt ...)'); error=true; break; }
+      const sub = tokens[1];
+      if(sub === 'update'){ out.push('Reading package lists... Done','Building dependency tree... Done'); }
+      else if(sub === 'install'){
+        const pkg = tokens[2];
+        if(!pkg){ out.push('E: You must specify a package to install'); error=true; break; }
+        if(!state.installedPackages.includes(pkg)) state.installedPackages.push(pkg);
+        out.push('Setting up '+pkg+' ... Done');
+      } else if(sub === 'remove'){
+        const pkg = tokens[2];
+        if(!pkg){ out.push('E: You must specify a package to remove'); error=true; break; }
+        state.installedPackages = state.installedPackages.filter(p=>p!==pkg);
+        out.push('Removing '+pkg+' ... Done');
+      } else { out.push("apt: unknown subcommand '"+sub+"'"); error=true; }
+      break;
+    }
+    case 'git': {
+      const g = state; const sub = tokens[1];
+      switch(sub){
+        case 'init':
+          g.initialized = true; out.push('Initialized empty Git repository in ~/project/.git/'); break;
+        case 'status': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          out.push('On branch '+g.currentBranch);
+          if(g.staged.length){ out.push('Changes to be committed:'); g.staged.forEach(f=>out.push('  new file:   '+f)); }
+          else out.push('nothing to commit, working tree clean');
+          break;
+        }
+        case 'add': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          const arg = tokens[2];
+          if(!arg){ out.push('Nothing specified, nothing added.'); error=true; break; }
+          if(arg === '.'){ Object.keys(g.files).forEach(f=>{ if(!g.staged.includes(f)) g.staged.push(f); }); }
+          else {
+            if(!g.files[arg]){ out.push("fatal: pathspec '"+arg+"' did not match any files"); error=true; break; }
+            if(!g.staged.includes(arg)) g.staged.push(arg);
+          }
+          break;
+        }
+        case 'commit': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          const mIdx = tokens.indexOf('-m');
+          if(mIdx === -1 || !tokens[mIdx+1]){ out.push('error: switch `m` requires a value'); error=true; break; }
+          if(g.staged.length === 0){ out.push('nothing to commit, working tree clean'); error=true; break; }
+          const message = tokens[mIdx+1];
+          g.commitCounter++;
+          const commit = {id:shortId(g.commitCounter), message, files:[...g.staged]};
+          g.branches[g.currentBranch].commits.push(commit);
+          out.push('['+g.currentBranch+' '+commit.id+'] '+message, ' '+g.staged.length+' file(s) changed');
+          g.staged = [];
+          break;
+        }
+        case 'log': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          const commits = g.branches[g.currentBranch].commits;
+          if(!commits.length){ out.push('fatal: your current branch does not have any commits yet'); error=true; break; }
+          [...commits].reverse().forEach(c=>{ out.push('commit '+c.id, '    '+c.message); });
+          break;
+        }
+        case 'branch': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          const name = tokens[2];
+          if(!name){ Object.keys(g.branches).forEach(b=> out.push((b===g.currentBranch?'* ':'  ')+b)); }
+          else {
+            if(g.branches[name]){ out.push("fatal: A branch named '"+name+"' already exists."); error=true; break; }
+            g.branches[name] = {commits:[...g.branches[g.currentBranch].commits]};
+          }
+          break;
+        }
+        case 'checkout': case 'switch': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          let args = tokens.slice(2), create=false;
+          if(args[0] === '-b' || args[0] === '-c'){ create=true; args=args.slice(1); }
+          const name = args[0];
+          if(!name){ out.push('error: missing branch name'); error=true; break; }
+          if(create){
+            if(g.branches[name]){ out.push("fatal: A branch named '"+name+"' already exists."); error=true; break; }
+            g.branches[name] = {commits:[...g.branches[g.currentBranch].commits]};
+          } else if(!g.branches[name]){
+            out.push("error: pathspec '"+name+"' did not match any file(s) known to git"); error=true; break;
+          }
+          g.currentBranch = name;
+          out.push("Switched to "+(create?"a new ":"")+"branch '"+name+"'");
+          break;
+        }
+        case 'merge': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          const name = tokens[2];
+          if(!name || !g.branches[name]){ out.push('merge: '+name+' - not something we can merge'); error=true; break; }
+          const targetCommits = g.branches[g.currentBranch].commits;
+          const sourceCommits = g.branches[name].commits;
+          const existing = new Set(targetCommits.map(c=>c.id));
+          const newOnes = sourceCommits.filter(c=>!existing.has(c.id));
+          if(newOnes.length === 0){ out.push('Already up to date.'); break; }
+          g.branches[g.currentBranch].commits = [...targetCommits, ...newOnes];
+          out.push("Merge made by the 'ort' strategy.", ' '+newOnes.length+' commit(s) merged from '+name);
+          break;
+        }
+        case 'remote': {
+          if(tokens[2] === 'add'){
+            const name=tokens[3], url=tokens[4];
+            if(!name || !url){ out.push('usage: git remote add <name> <url>'); error=true; break; }
+            g.remote = {name,url};
+          } else if(tokens[2] === '-v'){
+            if(!g.remote) out.push('');
+            else out.push(g.remote.name+'  '+g.remote.url+' (fetch)', g.remote.name+'  '+g.remote.url+' (push)');
+          } else { out.push('usage: git remote add <name> <url>'); error=true; }
+          break;
+        }
+        case 'push': {
+          if(!g.initialized){ out.push('fatal: not a git repository'); error=true; break; }
+          if(!g.remote){ out.push('fatal: No configured push destination.', 'Use: git remote add origin <url>'); error=true; break; }
+          const commits = g.branches[g.currentBranch].commits;
+          if(!commits.length){ out.push('Everything up-to-date'); break; }
+          g.pushedBranches[g.currentBranch] = commits.length;
+          out.push('To '+g.remote.url, ' * [new branch]      '+g.currentBranch+' -> '+g.currentBranch);
+          break;
+        }
+        case 'pull': {
+          if(!g.remote){ out.push('fatal: No configured remote'); error=true; break; }
+          out.push('Already up to date.'); break;
+        }
+        case 'clone': {
+          const url = tokens[2];
+          if(!url){ out.push('usage: git clone <url>'); error=true; break; }
+          g.initialized = true; g.remote = {name:'origin', url};
+          out.push("Cloning into 'project'...", 'done.'); break;
+        }
+        default:
+          out.push("git: '"+sub+"' is not a git command. See 'git help'."); error=true;
+      }
+      break;
+    }
+    default:
+      out.push(tokensAll[0]+': command not found'); error=true;
+  }
+  return {output:out, error};
+}
+
+/* ============================= LESSON CONTENT ============================= */
+
+const LESSONS = {
+  sudo: [
+    {
+      id:'sudo-1', title:'The Master Key',
+      analogy:"Think of your normal account as a staff badge  it opens the break room, not the server closet. <b>sudo</b> (\"superuser do\") is like radioing the front desk: they unlock one door for you, for one task, then the door re-locks itself.",
+      task:'Check who you normally are, then borrow admin power for a single command.',
+      chips:['whoami','sudo whoami'],
+      hint:'Type: whoami — then: sudo whoami — compare the two answers.',
+      validate:(state,history)=> history.some(h=>h.cmd.trim()==='whoami' && !h.error) && history.some(h=>h.cmd.trim()==='sudo whoami' && !h.error)
+    },
+    {
+      id:'sudo-2', title:'Who Owns What',
+      analogy:"Every file has an owner, like an apartment has a tenant. The permission string (e.g. <code>rw-r--r--</code>) is the lease: who can read it, who can write to it, who can only look through the window. You can freely change the locks on your own apartment — not your neighbour's.",
+      task:'List your files with details, then change notes.txt to permissions 644.',
+      chips:['ls -l','chmod 644 notes.txt'],
+      hint:'Type: ls -l — then: chmod 644 notes.txt (no sudo needed, you own it).',
+      validate:(state,history)=> history.some(h=>h.cmd.trim()==='ls -l') && state.files['notes.txt'] && state.files['notes.txt'].perm === '644'
+    },
+    {
+      id:'sudo-3', title:'Locked Doors',
+      analogy:"<code>/etc/hosts</code> belongs to root — the building superintendent. You can read the notice board (world-readable), but editing it without permission gets you a firm \"no.\" Radio the front desk with <b>sudo</b> and the door opens.",
+      task:'Try editing /etc/hosts without sudo (watch it get refused), then edit it with sudo.',
+      chips:['nano /etc/hosts','sudo nano /etc/hosts'],
+      hint:'Type: nano /etc/hosts (denied) — then: sudo nano /etc/hosts (works).',
+      validate:(state,history)=> history.some(h=>h.cmd.trim()==='nano /etc/hosts' && h.error) && state.etc['/etc/hosts'].edited === true
+    },
+    {
+      id:'sudo-4', title:'The Installer',
+      analogy:"Installing software writes files into shared system folders — like restocking the building's shared supply closet. Only the superintendent can do that, so <code>apt</code> always needs <b>sudo</b> behind it.",
+      task:'Refresh the package list, then install htop.',
+      chips:['sudo apt update','sudo apt install htop'],
+      hint:'Type: sudo apt update — then: sudo apt install htop',
+      validate:(state,history)=> history.some(h=>h.cmd.trim()==='sudo apt update' && !h.error) && state.installedPackages.includes('htop')
+    },
+    {
+      id:'sudo-5', title:'Handle With Care',
+      analogy:"sudo doesn't ask twice — it trusts you completely, which is exactly why it's dangerous in a hurry. A command like <code>sudo rm -rf /</code> would happily erase the whole building because you told it to. Good habit: read the command back to yourself before you press Enter, especially after typing sudo.",
+      task:'Practice a careful, deliberate sudo command: remove the htop package you just installed.',
+      chips:['sudo apt remove htop'],
+      hint:'Type: sudo apt remove htop',
+      validate:(state,history)=> history.some(h=>h.cmd.trim()==='sudo apt remove htop' && !h.error) && !state.installedPackages.includes('htop')
+    }
+  ],
+  git:[
+    {
+      id:'git-1', title:'Save Points',
+      analogy:"A git repository is a save-game system for a folder. <code>git init</code> turns an ordinary folder into one that remembers snapshots of itself over time — nothing is saved yet, it's just switched on.",
+      task:'Turn this folder into a git repository, then check its status.',
+      chips:['git init','git status'],
+      hint:'Type: git init — then: git status',
+      validate:(state,history)=> state.initialized && history.some(h=>h.cmd.trim()==='git status' && !h.error)
+    },
+    {
+      id:'git-2', title:'Staging Snapshots',
+      analogy:"<b>Staging</b> is the tray where you lay out exactly which photos go into the next album page. <code>git add</code> puts a file on the tray; <code>git commit</code> prints that page permanently into the album, with a message describing what's in it.",
+      task:'Create app.py, stage it, then commit it with a message.',
+      chips:['touch app.py','git add app.py','git commit -m "Add app.py"'],
+      hint:'Type: touch app.py — git add app.py — git commit -m "Add app.py"',
+      validate:(state,history)=> state.branches[state.currentBranch].commits.length >= 1
+    },
+    {
+      id:'git-3', title:'The Timeline',
+      analogy:"<code>git log</code> is the album's table of contents — every commit, in order, with the message you left yourself. It's how future-you figures out what past-you was thinking.",
+      task:'Add a second file, commit it, then view the full history.',
+      chips:['touch readme.md','git add readme.md','git commit -m "Add readme"','git log'],
+      hint:'Repeat the add → commit pattern for readme.md, then run: git log',
+      validate:(state,history)=> state.branches[state.currentBranch].commits.length >= 2 && history.some(h=>h.cmd.trim()==='git log' && !h.error)
+    },
+    {
+      id:'git-4', title:'Parallel Universes',
+      analogy:"A <b>branch</b> is an alternate timeline that splits off from your main story. You can experiment there — break things, try ideas — without touching the original until you're ready.",
+      task:'Create and switch to a feature-login branch, then commit a new file on it.',
+      chips:['git checkout -b feature-login','touch login.py','git add login.py','git commit -m "Add login"'],
+      hint:'Type: git checkout -b feature-login — then touch, add and commit login.py',
+      validate:(state,history)=> Object.keys(state.branches).length > 1 && state.currentBranch !== 'main' && state.branches[state.currentBranch].commits.length >= 1
+    },
+    {
+      id:'git-5', title:'Merging Timelines',
+      analogy:"<code>git merge</code> pulls another timeline's events back into the one you're standing in — like reconciling two diaries into one shared story. Nothing from your feature branch is real to \"main\" until you merge it in.",
+      task:'Switch back to main and merge feature-login into it.',
+      chips:['git checkout main','git merge feature-login'],
+      hint:'Type: git checkout main — then: git merge feature-login',
+      validate:(state,history)=> state.currentBranch === 'main' && history.some(h=>h.cmd.trim().startsWith('git merge') && !h.error)
+    },
+    {
+      id:'git-6', title:'Talking to the Cloud',
+      analogy:"A <b>remote</b> is a shared mailbox at a post office everyone can reach — usually GitHub. <code>git push</code> mails your latest commits there; <code>git pull</code> collects whatever your teammates mailed in.",
+      task:'Add a remote called origin, then push your main branch to it.',
+      chips:['git remote add origin https://github.com/precious/project.git','git push origin main'],
+      hint:'Type: git remote add origin https://github.com/precious/project.git — then: git push origin main',
+      validate:(state,history)=> state.remote !== null && Object.keys(state.pushedBranches).length >= 1
+    }
+  ]
+};
+
+/* ============================= STATE / STORAGE ============================= */
+
+const tracks = {
+  sudo:{ state:freshSudoState(), history:[], lines:[], cmdHist:[], cmdPtr:-1 },
+  git:{ state:freshGitState(), history:[], lines:[], cmdHist:[], cmdPtr:-1 }
+};
+let activeTrack = 'sudo';
+let currentLessonId = { sudo:LESSONS.sudo[0].id, git:LESSONS.git[0].id };
+let completed = { sudo:new Set(), git:new Set() };
+
+const STORAGE_KEY = 'rootbranch-progress';
+
+async function loadProgress(){
+  try{
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if(res && res.value){
+      const parsed = JSON.parse(res.value);
+      completed.sudo = new Set(parsed.sudo || []);
+      completed.git = new Set(parsed.git || []);
+    }
+  } catch(e){ /* no saved progress yet — start fresh */ }
+  renderSidebar(); renderProgressSummary();
+}
+async function saveProgress(){
+  try{
+    await window.storage.set(STORAGE_KEY, JSON.stringify({sudo:[...completed.sudo], git:[...completed.git]}), false);
+  } catch(e){ /* best effort — progress just won't persist this session */ }
+}
+
+/* ============================= RENDERING ============================= */
+
+const el = id => document.getElementById(id);
+const trackColor = t => t==='sudo' ? {c:'var(--sudo)', soft:'var(--sudo-soft)', line:'var(--sudo-line)'} : {c:'var(--git)', soft:'var(--git-soft)', line:'var(--git-line)'};
+
+function applyTrackTheme(t){
+  const tc = t==='sudo' ? getComputedStyle(document.documentElement).getPropertyValue('--sudo') : getComputedStyle(document.documentElement).getPropertyValue('--git');
+  document.documentElement.style.setProperty('--track-color', t==='sudo' ? 'var(--sudo)' : 'var(--git)');
+  document.documentElement.style.setProperty('--track-soft', t==='sudo' ? 'var(--sudo-soft)' : 'var(--git-soft)');
+  document.documentElement.style.setProperty('--track-line', t==='sudo' ? 'var(--sudo-line)' : 'var(--git-line)');
+}
+
+function renderSidebar(){
+  applyTrackTheme(activeTrack);
+  const list = LESSONS[activeTrack];
+  el('sidebar').innerHTML =
+    '<div class="sidebar-title">'+(activeTrack==='sudo'?'sudo track':'git track')+'</div>' +
+    list.map((l,i)=>{
+      const isDone = completed[activeTrack].has(l.id);
+      const isActive = currentLessonId[activeTrack] === l.id;
+      return '<div class="lesson-node '+(isDone?'done ':'')+(isActive?'active':'')+'" data-id="'+l.id+'">'
+        + '<span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>'
+        + '<div class="idx">Lesson '+(i+1)+'</div>'
+        + '<div class="label">'+l.title+'</div>'
+        + '</div>';
+    }).join('') +
+    '<div class="sidebar-foot"><button class="reset-btn" id="resetBtn">Reset '+activeTrack+' environment</button></div>';
+
+  el('sidebar').querySelectorAll('.lesson-node').forEach(node=>{
+    node.addEventListener('click', ()=>{ currentLessonId[activeTrack] = node.dataset.id; renderSidebar(); renderLessonCard(); });
+  });
+  el('resetBtn').addEventListener('click', resetActiveTrackEnvironment);
+}
+
+function renderProgressSummary(){
+  el('progressSummary').innerHTML =
+    '<b>'+completed.sudo.size+'/'+LESSONS.sudo.length+'</b> sudo &nbsp;·&nbsp; <b>'+completed.git.size+'/'+LESSONS.git.length+'</b> git';
+}
+
+function currentLesson(){
+  return LESSONS[activeTrack].find(l=>l.id === currentLessonId[activeTrack]);
+}
+
+function renderLessonCard(){
+  applyTrackTheme(activeTrack);
+  const list = LESSONS[activeTrack];
+  const lesson = currentLesson();
+  const idx = list.findIndex(l=>l.id===lesson.id);
+  const isDone = completed[activeTrack].has(lesson.id);
+  el('lessonCard').innerHTML =
+    '<div class="eyebrow">Lesson '+(idx+1)+' of '+list.length+'</div>'
+    + '<h2>'+lesson.title+'</h2>'
+    + '<p class="analogy">'+lesson.analogy+'</p>'
+    + '<div class="task-box"><div class="task-label">Try it</div><p>'+lesson.task+'</p>'
+      + '<div class="chips">'+lesson.chips.map(c=>'<span class="chip" data-cmd="'+c.replace(/"/g,'&quot;')+'">'+c+'</span>').join('')+'</div>'
+    + '</div>'
+    + '<div class="hint-row"><button class="hint-toggle" id="hintToggle">Need a hint?</button></div>'
+    + '<div class="hint-text" id="hintText">'+lesson.hint+'</div>'
+    + '<div class="success-banner '+(isDone?'show':'')+'" id="successBanner">'
+      + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>'
+      + '<span>Nailed it — lesson complete.</span></div>';
+
+  el('hintToggle').addEventListener('click', ()=>{
+    el('hintText').classList.toggle('show');
+    el('hintToggle').textContent = el('hintText').classList.contains('show') ? 'Hide hint' : 'Need a hint?';
+  });
+  el('lessonCard').querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{ el('termInput').value = chip.dataset.cmd; el('termInput').focus(); });
+  });
+}
+
+function renderCheatsheet(){
+  const sudoItems = [
+    ['whoami','who am I right now'],
+    ['sudo <cmd>','run one command as root'],
+    ['ls -l','list files with permissions'],
+    ['chmod <mode> <file>',"change a file's permissions"],
+    ['chown <user> <file>',"change a file's owner"],
+    ['sudo apt update','refresh package lists'],
+    ['sudo apt install <pkg>','install software'],
+    ['sudo apt remove <pkg>','uninstall software'],
+    ['sudo nano <file>','edit a root-owned file']
+  ];
+  const gitItems = [
+    ['git init','start tracking this folder'],
+    ['git status',"what's changed / staged"],
+    ['git add <file>','stage a file'],
+    ['git commit -m "msg"','save a snapshot'],
+    ['git log','view commit history'],
+    ['git branch <name>','create a branch'],
+    ['git checkout -b <name>','create + switch to a branch'],
+    ['git merge <name>',"bring a branch's work in"],
+    ['git remote add origin <url>','link a remote'],
+    ['git push / git pull','send / fetch commits']
+  ];
+  const items = activeTrack==='sudo' ? sudoItems : gitItems;
+  el('cheatGrid').innerHTML = items.map(([c,d])=> '<div class="cheat-item"><code>'+c+'</code><span>'+d+'</span></div>').join('');
+}
+
+function appendLine(text, cls){
+  const t = tracks[activeTrack];
+  t.lines.push({text, cls});
+  const div = document.createElement('div');
+  div.className = cls || 'term-line-out';
+  div.textContent = text;
+  el('terminal').appendChild(div);
+  el('terminal').scrollTop = el('terminal').scrollHeight;
+}
+function appendCmdLine(cmdText, wasSudo){
+  const t = tracks[activeTrack];
+  t.lines.push({cmdText, wasSudo, cls:'cmd'});
+  const div = document.createElement('div');
+  div.className = 'term-line-cmd';
+  const p = document.createElement('span');
+  p.className = 'p' + (wasSudo ? ' sudo' : '');
+  p.textContent = USERNAME + '@dojo:~$';
+  div.appendChild(p);
+  div.appendChild(document.createTextNode(cmdText));
+  el('terminal').appendChild(div);
+  el('terminal').scrollTop = el('terminal').scrollHeight;
+}
+
+function redrawTerminal(){
+  const t = tracks[activeTrack];
+  el('terminal').innerHTML = '';
+  t.lines.forEach(l=>{
+    if(l.cls === 'cmd'){
+      const div = document.createElement('div'); div.className='term-line-cmd';
+      const p = document.createElement('span'); p.className='p'+(l.wasSudo?' sudo':''); p.textContent = USERNAME+'@dojo:~$';
+      div.appendChild(p); div.appendChild(document.createTextNode(l.cmdText));
+      el('terminal').appendChild(div);
+    } else {
+      const div = document.createElement('div'); div.className = l.cls || 'term-line-out'; div.textContent = l.text;
+      el('terminal').appendChild(div);
+    }
+  });
+  el('terminal').scrollTop = el('terminal').scrollHeight;
+  el('termTitle').textContent = USERNAME + '@dojo — ' + activeTrack;
+}
+
+function bannerFor(track){
+  return track==='sudo'
+    ? 'Welcome to the sudo sandbox. Nothing here touches a real system — type "help" any time.'
+    : 'Welcome to the git sandbox — an empty project folder, ready for "git init". Type "help" any time.';
+}
+
+/* ============================= INTERACTION ============================= */
+
+function runCommand(raw){
+  const t = tracks[activeTrack];
+  const wasSudo = raw.trim().startsWith('sudo ') || raw.trim() === 'sudo';
+  appendCmdLine(raw, wasSudo);
+
+  const result = execute(t.state, raw);
+  t.history.push({cmd:raw, output:result.output, error:result.error});
+
+  if(result.output.length === 1 && result.output[0] === '__CLEAR__'){
+    t.lines = [];
+    el('terminal').innerHTML = '';
+  } else {
+    result.output.forEach(line=>{
+      appendLine(line, result.error ? 'term-line-err' : 'term-line-out');
+    });
+  }
+
+  // check current lesson completion
+  const lesson = currentLesson();
+  if(!completed[activeTrack].has(lesson.id) && lesson.validate(t.state, t.history)){
+    completed[activeTrack].add(lesson.id);
+    saveProgress();
+    renderSidebar();
+    renderProgressSummary();
+    const banner = el('successBanner');
+    if(banner) banner.classList.add('show');
+    appendLine('✓ lesson complete: "'+lesson.title+'"', 'term-line-ok');
+  }
+}
+
+function resetActiveTrackEnvironment(){
+  const t = tracks[activeTrack];
+  t.state = activeTrack === 'sudo' ? freshSudoState() : freshGitState();
+  t.history = [];
+  t.cmdHist = []; t.cmdPtr = -1;
+  t.lines = [];
+  el('terminal').innerHTML = '';
+  appendLine(bannerFor(activeTrack), 'term-line-sys');
+}
+
+function switchTrack(t){
+  activeTrack = t;
+  document.querySelectorAll('.tab').forEach(b=> b.classList.toggle('active', b.dataset.track===t));
+  applyTrackTheme(t);
+  renderSidebar();
+  renderLessonCard();
+  renderCheatsheet();
+  redrawTerminal();
+  el('termInput').focus();
+}
+
+el('trackTabs').addEventListener('click', e=>{
+  const btn = e.target.closest('.tab');
+  if(btn) switchTrack(btn.dataset.track);
+});
+
+el('termInput').addEventListener('keydown', e=>{
+  const t = tracks[activeTrack];
+  if(e.key === 'Enter'){
+    const val = el('termInput').value;
+    if(val.trim() === ''){ return; }
+    t.cmdHist.push(val); t.cmdPtr = t.cmdHist.length;
+    el('termInput').value = '';
+    runCommand(val);
+  } else if(e.key === 'ArrowUp'){
+    if(t.cmdHist.length === 0) return;
+    t.cmdPtr = Math.max(0, t.cmdPtr - 1);
+    el('termInput').value = t.cmdHist[t.cmdPtr] || '';
+    e.preventDefault();
+  } else if(e.key === 'ArrowDown'){
+    if(t.cmdHist.length === 0) return;
+    t.cmdPtr = Math.min(t.cmdHist.length, t.cmdPtr + 1);
+    el('termInput').value = t.cmdHist[t.cmdPtr] || '';
+    e.preventDefault();
+  }
+});
+
+/* ============================= INIT ============================= */
+appendLine(bannerFor('sudo'), 'term-line-sys');
+renderLessonCard();
+renderCheatsheet();
+redrawTerminal();
+loadProgress();
+el('termInput').focus();
+
+})();
+</script>
+</body>
+</html>
